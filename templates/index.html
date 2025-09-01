@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fabric Defect Detection</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .upload-area {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #0056b3;
+            background-color: #e9ecef;
+        }
+        .upload-area.dragover {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        .result-container {
+            display: none;
+        }
+        .confidence-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        .defect-count {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        .loading {
+            display: none;
+        }
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-search"></i> Fabric Defect Detection
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Image Upload</a>
+                <a class="nav-link" href="/camera">Camera</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-upload"></i> Upload Fabric Image</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" id="uploadArea">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                            <h5>Drag & Drop Image Here</h5>
+                            <p class="text-muted">or click to browse</p>
+                            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                            <button class="btn btn-primary" onclick="document.getElementById('imageInput').click()">
+                                <i class="fas fa-folder-open"></i> Browse Files
+                            </button>
+                        </div>
+
+                        <div class="mt-3">
+                            <label for="confidenceSlider" class="form-label">
+                                Confidence Threshold: <span id="confidenceValue">0.4</span>
+                            </label>
+                            <input type="range" class="form-range confidence-slider" 
+                                   id="confidenceSlider" min="0.05" max="0.95" step="0.05" value="0.4">
+                        </div>
+
+                        <div class="mt-3">
+                            <button class="btn btn-success" id="detectBtn" onclick="detectDefects()">
+                                <i class="fas fa-search"></i> Detect Defects
+                            </button>
+                            <div class="loading" id="loading">
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                Processing...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-container card mt-4" id="resultContainer">
+                    <div class="card-header">
+                        <h5><i class="fas fa-chart-bar"></i> Detection Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Original Image</h6>
+                                <img id="originalImage" class="img-fluid rounded" alt="Original Image">
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Result Image</h6>
+                                <img id="resultImage" class="img-fluid rounded" alt="Result Image">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-info-circle"></i> Detection Info</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="defect-count">
+                            <h6>Total Defects</h6>
+                            <h3 id="totalDefects">0</h3>
+                        </div>
+                        
+                        <div id="defectCounts">
+                            <!-- Individual defect counts will be populated here -->
+                        </div>
+
+                        <div class="mt-3">
+                            <h6>Detection Details</h6>
+                            <div id="detectionDetails">
+                                <!-- Detection details will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentImage = null;
+
+        // File upload handling
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInput = document.getElementById('imageInput');
+        const confidenceSlider = document.getElementById('confidenceSlider');
+        const confidenceValue = document.getElementById('confidenceValue');
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                currentImage = file;
+                document.getElementById('originalImage').src = e.target.result;
+                document.getElementById('resultContainer').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Confidence slider
+        confidenceSlider.addEventListener('input', (e) => {
+            confidenceValue.textContent = e.target.value;
+            updateConfidence(e.target.value);
+        });
+
+        async function updateConfidence(confidence) {
+            try {
+                const response = await fetch('/update_confidence', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ confidence: parseFloat(confidence) })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    console.log('Confidence updated:', data.confidence);
+                }
+            } catch (error) {
+                console.error('Error updating confidence:', error);
+            }
+        }
+
+        async function detectDefects() {
+            if (!currentImage) {
+                alert('Please upload an image first');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const detectBtn = document.getElementById('detectBtn');
+            
+            loading.style.display = 'inline-block';
+            detectBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('image', currentImage);
+
+            try {
+                const response = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Display result image
+                    document.getElementById('resultImage').src = 'data:image/jpeg;base64,' + data.result_image;
+                    
+                    // Update defect counts
+                    document.getElementById('totalDefects').textContent = data.total_defects;
+                    
+                    // Update individual defect counts
+                    updateDefectCounts(data.defect_counts);
+                    
+                    // Update detection details
+                    updateDetectionDetails(data.detections);
+                    
+                    // Show results
+                    document.getElementById('resultContainer').style.display = 'block';
+                } else {
+                    alert('Detection failed: ' + data.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred during detection');
+            } finally {
+                loading.style.display = 'none';
+                detectBtn.disabled = false;
+            }
+        }
+
+        function updateDefectCounts(defectCounts) {
+            const container = document.getElementById('defectCounts');
+            container.innerHTML = '';
+
+            for (const [defectType, count] of Object.entries(defectCounts)) {
+                const defectDiv = document.createElement('div');
+                defectDiv.className = 'defect-count';
+                defectDiv.innerHTML = `
+                    <h6>${defectType.charAt(0).toUpperCase() + defectType.slice(1)} Count</h6>
+                    <h3>${count}</h3>
+                `;
+                container.appendChild(defectDiv);
+            }
+        }
+
+        function updateDetectionDetails(detections) {
+            const container = document.getElementById('detectionDetails');
+            container.innerHTML = '';
+
+            if (detections.length === 0) {
+                container.innerHTML = '<p class="text-muted">No defects detected</p>';
+                return;
+            }
+
+            detections.forEach((det, index) => {
+                const detDiv = document.createElement('div');
+                detDiv.className = 'border-bottom pb-2 mb-2';
+                detDiv.innerHTML = `
+                    <strong>${det.class}</strong><br>
+                    <small class="text-muted">Confidence: ${(det.confidence * 100).toFixed(1)}%</small>
+                `;
+                container.appendChild(detDiv);
+            });
+        }
+    </script>
+</body>
+</html>

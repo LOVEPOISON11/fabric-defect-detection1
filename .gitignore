@@ -1,17 +1,3 @@
-.vercel
-*.log
-*.pyc
-__pycache__
-
-# Environments 
-.env 
-.venv 
-env/ 
-venv/ 
-ENV/ 
-env.bak/ 
-venv.bak/ 
-
 # Python
 __pycache__/
 *.py[cod]
@@ -71,8 +57,9 @@ uploads/
 *.bmp
 *.tiff
 
-# Model files (large files)
+# Model files (large files) - but allow models directory
 *.pt
+!models/*.pt
 *.pth
 *.onnx
 *.tflite
