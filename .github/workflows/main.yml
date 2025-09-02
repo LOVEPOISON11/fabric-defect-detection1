@@ -1,4 +1,4 @@
-name: Web Build + Deployment to GitHub Pages 
+name: Flask App Build + Deployment to GitHub Pages
 
 on:
   # Runs on push to any of the below branches
@@ -21,24 +21,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # https://flet.dev/docs/publish#versioning
-  BUILD_NUMBER: 1
-  BUILD_VERSION: 1.0.0
-
   # Python version to use
-  PYTHON_VERSION: 3.12.8
-
-  # flet-cli version to install for `flet build`
-  FLET_CLI_VERSION: 0.27.5
+  PYTHON_VERSION: 3.11
 
   # Ensures Python uses UTF-8 encoding by default
   PYTHONUTF8: 1
-
-  # Disables rich text formatting in Flet CLI output
-  FLET_CLI_NO_RICH_OUTPUT: 1
-
-  # Disables progress bars when using UV
-  UV_NO_PROGRESS: 1
 
 jobs:
   build:
@@ -49,28 +36,91 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Setup Python ${{ env.PYTHON_VERSION }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Install flet-cli ${{ env.FLET_CLI_VERSION }}
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flet-cli==$FLET_CLI_VERSION
+        pip install -r requirements.txt
+        pip install gunicorn
 
-    - name: Flet Build Web
+    - name: Create static build directory
       run: |
-        echo "GITHUB_REPOSITORY: ${GITHUB_REPOSITORY}, USER: ${GITHUB_REPOSITORY%/*}, PROJECT_BASE_URL: ${GITHUB_REPOSITORY#*/}"
-        flet build web --base-url ${GITHUB_REPOSITORY#*/} --route-url-strategy hash
+        mkdir -p build
+        cp -r templates build/
+        cp -r models build/ || echo "Models directory not found, skipping"
+        cp -r static build/ || mkdir -p build/static
+        cp api/index.py build/
+        cp fabric_defect_detector*.py build/ || echo "Detector files not found, skipping"
+
+    - name: Create index.html for GitHub Pages
+      run: |
+        cat > build/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Fabric Defect Detection</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; text-align: center; }
+                .container { max-width: 800px; margin: 0 auto; }
+                .note { background: #f0f8ff; padding: 20px; border-radius: 8px; margin: 20px 0; }
+                .links { margin: 30px 0; }
+                .links a { display: inline-block; margin: 10px; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; }
+                .links a:hover { background: #0056b3; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🧵 Fabric Defect Detection System</h1>
+                <div class="note">
+                    <h3>📋 Project Information</h3>
+                    <p>This is a Flask-based fabric defect detection system using computer vision and machine learning.</p>
+                    <p><strong>Note:</strong> This static deployment shows the project structure. For full functionality, deploy to a platform that supports Python backends like Vercel, Heroku, or Railway.</p>
+                </div>
+
+                <div class="links">
+                    <h3>🔗 Quick Links</h3>
+                    <a href="templates/index.html">View Main Interface</a>
+                    <a href="templates/camera.html">View Camera Interface</a>
+                    <a href="https://github.com/${{ github.repository }}">View Source Code</a>
+                </div>
+
+                <div class="note">
+                    <h3>🚀 Deployment Options</h3>
+                    <p><strong>Vercel:</strong> Already configured with vercel.json</p>
+                    <p><strong>Heroku:</strong> Add Procfile for deployment</p>
+                    <p><strong>Railway:</strong> Direct deployment from GitHub</p>
+                </div>
+
+                <div class="note">
+                    <h3>📁 Project Structure</h3>
+                    <ul style="text-align: left; display: inline-block;">
+                        <li><code>app.py</code> - Main Flask application</li>
+                        <li><code>api/index.py</code> - Vercel-optimized entry point</li>
+                        <li><code>fabric_defect_detector.py</code> - AI detection logic</li>
+                        <li><code>templates/</code> - HTML templates</li>
+                        <li><code>models/</code> - ML model files</li>
+                        <li><code>requirements.txt</code> - Python dependencies</li>
+                        <li><code>vercel.json</code> - Vercel deployment config</li>
+                    </ul>
+                </div>
+            </div>
+        </body>
+        </html>
+        EOF
 
     - name: Upload Artifact
       uses: actions/upload-pages-artifact@v3
       with:
-        name: web-build-artifact  # the name of the artifact
-        path: build/web
+        name: web-build-artifact
+        path: build
 
   deploy:
-    needs: build  # wait for the "build" job to get done before executing this "deploy" job
+    needs: build
 
     runs-on: ubuntu-latest
 
@@ -83,11 +133,11 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-      
+
     steps:
       - name: Setup Pages
         uses: actions/configure-pages@v5
-        
+
       - name: Deploy to GitHub Pages 🚀
         if: github.event_name == 'push'  # deploy only on push
         id: deployment
