@@ -1,0 +1,191 @@
+name: Deploy Flask App to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Create build directory
+      run: |
+        mkdir -p dist
+        
+    - name: Copy project files
+      run: |
+        # Copy templates
+        cp -r templates dist/ || echo "No templates directory"
+        
+        # Copy static files if they exist
+        cp -r static dist/ 2>/dev/null || mkdir -p dist/static
+        
+        # Copy Python files
+        cp *.py dist/ 2>/dev/null || echo "No Python files in root"
+        
+        # Copy API directory
+        cp -r api dist/ 2>/dev/null || echo "No API directory"
+        
+        # Copy models if they exist
+        cp -r models dist/ 2>/dev/null || echo "No models directory"
+        
+    - name: Create GitHub Pages index
+      run: |
+        cat > dist/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Fabric Defect Detection System</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+            <style>
+                body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+                .card { box-shadow: 0 10px 30px rgba(0,0,0,0.1); border: none; }
+                .hero { background: rgba(255,255,255,0.95); backdrop-filter: blur(10px); }
+                .feature-card { transition: transform 0.3s; }
+                .feature-card:hover { transform: translateY(-5px); }
+                .tech-badge { background: #f8f9fa; border: 1px solid #dee2e6; }
+            </style>
+        </head>
+        <body>
+            <div class="container py-5">
+                <div class="row justify-content-center">
+                    <div class="col-lg-10">
+                        <div class="card hero">
+                            <div class="card-body p-5 text-center">
+                                <i class="fas fa-microscope fa-4x text-primary mb-4"></i>
+                                <h1 class="display-4 fw-bold mb-3">🧵 Fabric Defect Detection</h1>
+                                <p class="lead mb-4">AI-powered fabric quality inspection system using computer vision and machine learning</p>
+                                
+                                <div class="row g-4 mt-4">
+                                    <div class="col-md-4">
+                                        <div class="card feature-card h-100">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-camera fa-2x text-success mb-3"></i>
+                                                <h5>Real-time Detection</h5>
+                                                <p class="text-muted">Upload images or use camera for instant defect analysis</p>
+                                                <a href="templates/index.html" class="btn btn-outline-success">View Interface</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="card feature-card h-100">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-video fa-2x text-info mb-3"></i>
+                                                <h5>Camera Integration</h5>
+                                                <p class="text-muted">Live camera feed with real-time defect detection</p>
+                                                <a href="templates/camera.html" class="btn btn-outline-info">Camera View</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-4">
+                                        <div class="card feature-card h-100">
+                                            <div class="card-body text-center">
+                                                <i class="fab fa-github fa-2x text-dark mb-3"></i>
+                                                <h5>Open Source</h5>
+                                                <p class="text-muted">Full source code available on GitHub</p>
+                                                <a href="https://github.com/LOVEPOISON11/fabric-defect-detection1" class="btn btn-outline-dark">View Code</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <hr class="my-5">
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h4><i class="fas fa-cogs text-primary"></i> Technology Stack</h4>
+                                        <div class="d-flex flex-wrap gap-2 mt-3">
+                                            <span class="badge tech-badge">Python</span>
+                                            <span class="badge tech-badge">Flask</span>
+                                            <span class="badge tech-badge">OpenCV</span>
+                                            <span class="badge tech-badge">YOLOv8</span>
+                                            <span class="badge tech-badge">NumPy</span>
+                                            <span class="badge tech-badge">Computer Vision</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h4><i class="fas fa-rocket text-success"></i> Deployment Options</h4>
+                                        <ul class="list-unstyled mt-3">
+                                            <li><i class="fas fa-check text-success"></i> Vercel (Configured)</li>
+                                            <li><i class="fas fa-check text-success"></i> Heroku</li>
+                                            <li><i class="fas fa-check text-success"></i> Railway</li>
+                                            <li><i class="fas fa-check text-success"></i> GitHub Pages</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-info mt-4">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Note:</strong> This is a static showcase. For full functionality with AI detection, 
+                                    deploy to a platform supporting Python backends like Vercel or Heroku.
+                                </div>
+                                
+                                <div class="mt-4">
+                                    <a href="https://github.com/LOVEPOISON11/fabric-defect-detection1" class="btn btn-primary btn-lg me-3">
+                                        <i class="fab fa-github"></i> View Repository
+                                    </a>
+                                    <a href="templates/index.html" class="btn btn-outline-primary btn-lg">
+                                        <i class="fas fa-play"></i> Try Demo
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+        </body>
+        </html>
+        EOF
+        
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ./dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
